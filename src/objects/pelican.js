@@ -534,9 +534,9 @@ export function createPelican(renderer) {
     aimSegment(leg.knee, shankDir);
     leg.knee.updateMatrixWorld(true);
 
-    // the foot stays level with the world, not with the shank
+    // the foot rides level, pointing along the pedal's forward, not up the shank
     const ankleInv = _legM.copy(leg.ankle.parent.matrixWorld).invert();
-    const footDir = _legC.set(0, 1, 0);
+    const footDir = _legC.set(0.02, 0.28, 0.96).normalize();
     footDir.transformDirection(ankleInv);
     aimSegment(leg.ankle, footDir);
   }

@@ -12,13 +12,13 @@ export function createRig(pelican, bicycle) {
 
   // seat the pelican on the saddle: its root sits at the saddle top, not on the ground
   const saddleTop = new THREE.Vector3(
-    bicycle.geo.seatTop.x + 0.055,
-    bicycle.geo.seatTop.y + 0.152,
+    bicycle.geo.seatTop.x - 0.02,
+    bicycle.geo.seatTop.y + 0.10,
     0,
   );
   pelican.group.position.copy(saddleTop);
   pelican.group.rotation.y = 0;
-  pelican.group.scale.setScalar(1.18);
+  pelican.group.scale.setScalar(0.86);
   pelican.group.updateMatrixWorld(true);
 
   const state = {

@@ -82,12 +82,13 @@ const runtime = {
   shake: 0,
   fade: 0,
   realTime: 0,
+  camAuto: true,
+  filmTime: 0,
   mouse: { x: 0, y: 0 },
   orbit: { yaw: 0.5, pitch: 0.25, dist: 5.2, manual: false },
 };
 
 let renderer, scene, camera, post, env, pelican, bicycle, rig, director, audio;
-let clock;
 
 async function build() {
   await setProgress(0.04, '创建渲染器…');  renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, alpha: false });
@@ -135,7 +136,6 @@ async function build() {
   await setProgress(1.0, '就绪');
   enterBtn.disabled = false;
   enterK.textContent = 'Press Enter';
-  clock = new THREE.Clock();
   window.__pelican = { renderer, scene, camera, post, env, pelican, bicycle, rig, director, audio, settings, runtime, THREE };
   requestAnimationFrame(loop);
 }
@@ -291,12 +291,19 @@ function start() {
   director.state.playing = true;
 }
 
-let frames = 0, fpsAcc = 0, fpsTimer = 0, msAcc = 0;
+let frames = 0, fpsAcc = 0, fpsTimer = 0, msSum = 0, lastWall = 0;
 function loop() {
   requestAnimationFrame(loop);
-  if (!clock) clock = new THREE.Clock();
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const t = clock.elapsedTime;
+  const now = performance.now();
+  const wall = lastWall ? (now - lastWall) / 1000 : 1 / 60;
+  lastWall = now;
+
+  // Everything is driven by the wall clock: `dt` is how much time really passed.
+  // Clamping it to the frame budget (the obvious `min(dt, 0.05)`) made a slow renderer
+  // play the whole scene in slow motion, which is exactly what happened here.
+  const dt = Math.min(wall, 0.25);
+  runtime.filmTime += dt;
+  const t = runtime.filmTime;
   runtime.realTime = t;
 
   runtime.speed = damp(runtime.speed, 1.05 * settings.tempo, 2.0, dt);
@@ -364,16 +371,16 @@ function loop() {
   post.render({ realTime: t, fade: runtime.fade });
 
   frames++;
-  fpsAcc += dt;
-  fpsTimer += dt;
-  msAcc += dt;
+  fpsAcc += wall;
+  fpsTimer += wall;
+  msSum += wall;
   if (fpsTimer > 0.5) {
     const info = renderer.info.render;
     statFps.textContent = String(Math.round(frames / fpsAcc));
-    statMs.textContent = (msAcc / frames * 1000).toFixed(1);
+    statMs.textContent = (msSum / frames * 1000).toFixed(1);
     statTri.textContent = formatInt(info.triangles);
     statDraw.textContent = String(info.calls);
-    frames = 0; fpsAcc = 0; fpsTimer = 0; msAcc = 0;
+    frames = 0; fpsAcc = 0; fpsTimer = 0; msSum = 0;
   }
 }
 
