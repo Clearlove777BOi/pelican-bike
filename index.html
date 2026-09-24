@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>鹈鹕骑自行车 · Pelican on a Bicycle</title>
+<meta name="description" content="一只鹈鹕骑着自行车，沿海边公路穿过晨雾。纯程序生成的实时 3D 场景。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0d1117;
+    --paper:#f4efe6;
+    --sun:#ffb257;
+    --sea:#1d4e63;
+    --haze:#c9d6dd;
+    --warn:#d4542f;
+    --font-display:"Instrument Serif","Songti SC",Georgia,serif;
+    --font-ui:"Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color-scheme: dark;
+  }
+  html,body{height:100%;margin:0;background:#07090c;color:var(--paper);overflow:hidden}
+  body{font-family:var(--font-ui);-webkit-font-smoothing:antialiased}
+  #app{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+
+  /* ---------- loading ---------- */
+  #boot{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:
+      radial-gradient(120% 90% at 62% 18%,rgba(255,178,87,.16),transparent 58%),
+      linear-gradient(178deg,#0a1016,#07090c 62%,#05070a);
+    transition:opacity .9s ease,visibility 0s linear .9s}
+  #boot.done{opacity:0;visibility:hidden;pointer-events:none}
+  #boot .inner{text-align:center;padding:0 24px;width:min(560px,100%)}
+  #boot h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:clamp(34px,7vw,72px);line-height:1.02;letter-spacing:.01em}
+  #boot h1 em{font-style:italic;color:var(--sun)}
+  #boot .sub{margin:14px 0 0;font-size:13px;letter-spacing:.32em;text-transform:uppercase;color:#8fa3b0}
+  #bar{margin:34px auto 0;width:min(320px,72vw);height:1px;background:rgba(244,239,230,.16);position:relative;overflow:hidden}
+  #bar i{position:absolute;inset:0;background:linear-gradient(90deg,var(--sun),#ffe3b8);transform-origin:0 50%;transform:scaleX(0);transition:transform .35s ease}
+  #boot .msg{margin:16px 0 0;min-height:1.4em;font-size:12px;letter-spacing:.1em;color:#7e919e}
+  #boot .err{margin:18px auto 0;display:none;max-width:52ch;padding:10px 14px;border:1px solid rgba(212,84,47,.5);background:rgba(212,84,47,.1);
+    font-size:12.5px;line-height:1.5;color:#ffd9cc;text-align:left}
+  #boot .err.on{display:block}
+  #enter{margin-top:30px;min-height:48px;padding:0 44px;border:1px solid rgba(244,239,230,.28);background:transparent;color:var(--paper);
+    font-family:var(--font-display);font-size:15px;letter-spacing:.34em;text-transform:uppercase;cursor:pointer;transition:border-color .4s,background .4s,color .4s}
+  #enter:hover:not(:disabled){border-color:var(--sun);background:rgba(255,178,87,.08);color:#fff2e0}
+  #enter:disabled{opacity:.4;cursor:progress}
+  #enter .k{display:block;margin-top:6px;font-family:var(--font-ui);font-size:9.5px;letter-spacing:.28em;color:#8fa3b0}
+
+  /* ---------- hud ---------- */
+  #hud{position:fixed;inset:0;z-index:20;pointer-events:none;opacity:0;transition:opacity .8s ease .3s}
+  #hud.on{opacity:1}
+  #hud .tl{position:absolute;top:max(18px,env(safe-area-inset-top));left:max(18px,env(safe-area-inset-left))}
+  #hud .tl b{display:block;font-family:var(--font-display);font-weight:400;font-size:19px;letter-spacing:.02em}
+  #hud .tl span{display:block;margin-top:5px;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:#93a6b2}
+  #hud .stat{position:absolute;top:max(18px,env(safe-area-inset-top));right:max(18px,env(safe-area-inset-right));text-align:right;
+    font-variant-numeric:tabular-nums;font-size:10.5px;letter-spacing:.14em;color:#93a6b2;line-height:1.9}
+  #hud .stat b{color:var(--paper);font-weight:500}
+
+  #panel{position:fixed;z-index:22;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));
+    width:min(302px,calc(100vw - 36px));padding:15px 16px 13px;pointer-events:auto;
+    background:rgba(9,13,18,.74);backdrop-filter:blur(14px);border:1px solid rgba(244,239,230,.12);
+    opacity:0;transform:translateY(8px);transition:opacity .5s ease,transform .5s ease}
+  #panel.on{opacity:1;transform:none}
+  #panel h2{margin:0 0 11px;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:#8fa3b0;font-weight:500}
+  #panel .ctl{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px 10px;margin:9px 0}
+  #panel .ctl label{font-size:11px;letter-spacing:.06em;color:#c3cfd6;white-space:nowrap}
+  #panel .ctl output{font-size:10.5px;color:#8fa3b0;font-variant-numeric:tabular-nums;min-width:3.4em;text-align:right}
+  #panel input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:rgba(244,239,230,.2);outline:none;cursor:pointer}
+  #panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--sun);border:0}
+  #panel input[type=range]::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;background:var(--sun)}
+  #panel .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:11px;border-top:1px solid rgba(244,239,230,.1)}
+  #panel button{pointer-events:auto;min-height:32px;padding:0 12px;border:1px solid rgba(244,239,230,.18);background:transparent;color:#c3cfd6;
+    font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:border-color .3s,color .3s,background .3s}
+  #panel button:hover{border-color:var(--sun);color:#fff2e0}
+  #panel button[aria-pressed=true]{border-color:var(--sun);background:rgba(255,178,87,.14);color:#fff2e0}
+  #panel .hint{grid-column:1/-1;margin:8px 0 0;font-size:10.5px;line-height:1.55;color:#8496a3}
+  #toggle{position:fixed;z-index:23;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));
+    width:38px;height:38px;display:none;place-items:center;border:1px solid rgba(244,239,230,.2);background:rgba(9,13,18,.7);color:#c3cfd6;cursor:pointer}
+  #toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.4}
+  @media (max-width:640px){
+    #panel.on + #toggle{display:none}
+    #panel{width:calc(100vw - 36px)}
+    #hud .tl b{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div class="tl">
+    <b>鹈鹕骑自行车</b>
+    <span>Pelican on a Bicycle</span>
+  </div>
+  <div class="stat">
+    <div>FPS <b id="s-fps">–</b></div>
+    <div>帧 <b id="s-ms">–</b> ms</div>
+    <div>三角面 <b id="s-tri">–</b></div>
+    <div>绘制 <b id="s-draw">–</b></div>
+  </div>
+</div>
+
+<div id="boot">
+  <div class="inner">
+    <h1>鹈鹕<em>骑</em>自行车</h1>
+    <p class="sub">Pelican on a Bicycle</p>
+    <div id="bar"><i></i></div>
+    <p class="msg" id="boot-msg">正在装配场景…</p>
+    <div class="err" id="boot-err"></div>
+    <button id="enter" disabled>进入<span class="k" id="enter-k">Preparing</span></button>
+  </div>
+</div>
+
+<div id="panel">
+  <h2>控制台 / Console</h2>
+  <div class="ctl"><label for="c-hour">时间</label><input id="c-hour" type="range" min="0" max="1" step="0.001" value="0.18"><output id="o-hour">–</output></div>
+  <div class="ctl"><label for="c-tempo">车速</label><input id="c-tempo" type="range" min="0" max="2.2" step="0.01" value="1"><output id="o-tempo">–</output></div>
+  <div class="ctl"><label for="c-flap">振翅</label><input id="c-flap" type="range" min="0" max="1.6" step="0.01" value="0.5"><output id="o-flap">–</output></div>
+  <div class="ctl"><label for="c-wind">海风</label><input id="c-wind" type="range" min="0" max="2" step="0.01" value="1"><output id="o-wind">–</output></div>
+  <div class="ctl"><label for="c-vol">音量</label><input id="c-vol" type="range" min="0" max="1" step="0.01" value="0.55"><output id="o-vol">–</output></div>
+  <div class="ctl"><label for="c-tilt">倾斜</label><input id="c-tilt" type="range" min="0" max="1" step="0.01" value="0.35"><output id="o-tilt">–</output></div>
+  <div class="row">
+    <button id="b-cam" type="button">机位</button>
+    <button id="b-shake" type="button" aria-pressed="true">手持感</button>
+    <button id="b-shadow" type="button" aria-pressed="true">阴影</button>
+    <button id="b-bloom" type="button" aria-pressed="true">辉光</button>
+    <button id="b-quality" type="button">画质 高</button>
+    <button id="b-help" type="button">帮助</button>
+  </div>
+  <p class="hint" id="panel-hint">拖拽旋转 · 滚轮缩放 · 右键平移</p>
+</div>
+<button id="toggle" type="button" aria-label="显示控制台"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
