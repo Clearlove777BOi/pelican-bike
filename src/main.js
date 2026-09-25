@@ -73,6 +73,7 @@ const settings = {
   bloom: true,
   quality: 'high',
   camAuto: true,
+  adaptive: true,
 };
 
 const runtime = {
@@ -136,7 +137,7 @@ async function build() {
   await setProgress(1.0, '就绪');
   enterBtn.disabled = false;
   enterK.textContent = 'Press Enter';
-  window.__pelican = { renderer, scene, camera, post, env, pelican, bicycle, rig, director, audio, settings, runtime, THREE };
+  window.__pelican = { renderer, scene, camera, post, env, pelican, bicycle, rig, director, audio, settings, runtime, adapt, LADDER, THREE };
   requestAnimationFrame(loop);
 }
 
@@ -292,6 +293,39 @@ function start() {
 }
 
 let frames = 0, fpsAcc = 0, fpsTimer = 0, msSum = 0, lastWall = 0;
+
+// -------- adaptive quality --------
+// The heaviest costs, in order: the sea shader, depth of field, shadows, the resolvable
+// grass. Rather than guess a tier per device, watch the real frame time and shed them.
+const LADDER = [
+  { name: 'DoF', apply: (on) => { runtime.dofOn = on; } },
+  { name: 'sea detail', apply: (on) => { env.setSeaDetail(on); } },
+  { name: 'shadows', apply: (on) => { renderer.shadowMap.enabled = on; settings.shadows = on; } },
+  { name: 'pixel ratio', apply: (on) => { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, on ? 1.5 : 1.0)); onResize(); } },
+  { name: 'grass', apply: (on) => { env.setGrassDensity(on ? 1 : 0.4); } },
+];
+const adapt = { level: 0, window: 0, frames: 0, cooldown: 3, dir: -1 };
+
+function adaptStep(dt) {
+  if (!settings.adaptive) return;
+  adapt.frames++;
+  adapt.window += dt;
+  if (adapt.window < 1.5) return;
+  const fps = adapt.frames / adapt.window;
+  adapt.window = 0;
+  adapt.frames = 0;
+  if (adapt.cooldown > 0) { adapt.cooldown -= 1.5; return; }
+  if (fps < 40 && adapt.level < LADDER.length) {
+    LADDER[adapt.level].apply(false);
+    adapt.level++;
+    adapt.cooldown = 3;
+  } else if (fps > 58 && adapt.level > 0) {
+    adapt.level--;
+    LADDER[adapt.level].apply(true);
+    adapt.cooldown = 4.5;
+  }
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const now = performance.now();
@@ -368,7 +402,10 @@ function loop() {
     env.sun.target.updateMatrixWorld();
   }
 
-  post.render({ realTime: t, fade: runtime.fade });
+  post.render({ realTime: t, fade: runtime.fade, dof: runtime.dofOn,
+    aperture: runtime.dofOn === false ? 0 : camera.userData.aperture });
+
+  adaptStep(dt);
 
   frames++;
   fpsAcc += wall;

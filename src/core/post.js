@@ -228,14 +228,15 @@ export function createPost(renderer, scene, camera) {
     const info = renderer.info.render;
     sceneStats = { calls: info.calls, triangles: info.triangles, points: info.points, lines: info.lines };
 
-    const dofOn = quality.level !== 'low' && (cam.userData.aperture || 0) > 0.02;
+    const dofAllowed = ctx.dof !== false;
+    const dofOn = quality.level !== 'low' && dofAllowed && (ctx.aperture != null ? ctx.aperture : (cam.userData.aperture || 0)) > 0.02;
     let colorTex = sceneRT.texture;
     if (dofOn) {
       dofMat.uniforms.tDepth.value = sceneDepth;
       dofMat.uniforms.uNear.value = cam.near;
       dofMat.uniforms.uFar.value = cam.far;
       dofMat.uniforms.uFocus.value = cam.userData.focus || 3;
-      dofMat.uniforms.uAperture.value = cam.userData.aperture || 0.1;
+      dofMat.uniforms.uAperture.value = ctx.aperture != null ? ctx.aperture : (cam.userData.aperture || 0.1);
       dofMat.uniforms.uMaxCoC.value = 0.014;
       renderPass(dofMat, dofRT, sceneRT.texture);
       colorTex = dofRT.texture;

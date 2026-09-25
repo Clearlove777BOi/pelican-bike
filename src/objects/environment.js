@@ -214,10 +214,11 @@ export function createEnvironment(scene, renderer) {
       uSky: { value: new THREE.Color(0.42, 0.52, 0.62) },
       uShoreZ: { value: -22.0 },
       uChoppy: { value: 1.0 },
+      uDetail: { value: 1.0 },
     }),
     vertexShader: `
       #include <fog_pars_vertex>
-      uniform float uTime; uniform vec3 uSunDir; uniform float uChoppy; uniform float uShoreZ;
+      uniform float uTime; uniform vec3 uSunDir; uniform float uChoppy; uniform float uDetail; uniform float uShoreZ;
       varying vec3 vWorld; varying vec3 vNormalW; varying float vShore;
       vec3 waveDisp(vec2 p, float t, out vec3 nrm){
         vec3 acc = vec3(0.0);
@@ -230,6 +231,7 @@ export function createEnvironment(scene, renderer) {
         amp[3]=0.038; len[3]=7.0; dir[3]=normalize(vec2(-0.88,-0.47)); spd[3]=1.2;
         amp[4]=0.018; len[4]=4.0; dir[4]=normalize(vec2(0.29,0.96)); spd[4]=1.5;
         for (int i = 0; i < N; i++) {
+          if (i >= 3 && uDetail < 0.5) break;
           float a = amp[i] * uChoppy;
           float k = 6.2831853 / len[i];
           float f = dot(dir[i], p) * k - uTime * spd[i] * k * 1.6;
@@ -279,7 +281,7 @@ export function createEnvironment(scene, renderer) {
         col += uSunCol * pow(nh, 42.0) * 0.16;
         // sparkle: tiny facets turning to the sun, animated in the wave frame
         float chirp = sin(vWorld.x * 3.1 + uTime * 2.3) * sin(vWorld.z * 2.7 - uTime * 1.9);
-        col += uSunCol * pow(max(chirp, 0.0), 26.0) * pow(nh, 8.0) * 0.5;
+        col += uSunCol * pow(max(chirp, 0.0), 26.0) * pow(nh, 8.0) * 0.5 * uDetail;
         // foam where the waves get steep, and a foam line along the shore
         float steep = 1.0 - clamp(N.y, 0.0, 1.0);
         float foam = smoothstep(0.16, 0.34, steep) * 0.55;
@@ -754,11 +756,24 @@ export function createEnvironment(scene, renderer) {
     if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
     grass.visible = level !== 'low';
     cloudGroup.visible = true;
+    setSeaDetail(level !== 'low');
+  }
+
+  // Sea cost in one switch: the cheap path keeps one wave octave and drops the glints.
+  function setSeaDetail(on) {
+    seaMat.uniforms.uChoppy.value = on ? 1.0 : 0.45;
+    seaMat.uniforms.uDetail.value = on ? 1.0 : 0.0;
+  }
+
+  function setGrassDensity(k) {
+    const n = Math.floor(GRASS_N * clamp(k, 0, 1));
+    grass.count = Math.min(n, GRASS_N);
   }
 
   return {
     group, sun, hemi, fill, rim, fog, sea, terrain, road, windmill,
-    state, update, setQuality, sunDir,
+    state, update, setQuality, sunDir, seaMat,
+    setSeaDetail, setGrassDensity,
     roadHeight, terrainHeight,
     fogColor: () => scene.fog.color,
   };
