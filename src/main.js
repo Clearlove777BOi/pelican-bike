@@ -304,25 +304,25 @@ const LADDER = [
   { name: 'pixel ratio', apply: (on) => { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, on ? 1.5 : 1.0)); onResize(); } },
   { name: 'grass', apply: (on) => { env.setGrassDensity(on ? 1 : 0.4); } },
 ];
-const adapt = { level: 0, window: 0, frames: 0, cooldown: 3, dir: -1 };
+const adapt = { level: 0, window: 0, frames: 0, cooldown: 0, dir: -1 };
 
-function adaptStep(dt) {
+function adaptStep(wall) {
   if (!settings.adaptive) return;
   adapt.frames++;
-  adapt.window += dt;
-  if (adapt.window < 1.5) return;
+  adapt.window += wall;
+  if (adapt.window < 1.2) return;
   const fps = adapt.frames / adapt.window;
   adapt.window = 0;
   adapt.frames = 0;
-  if (adapt.cooldown > 0) { adapt.cooldown -= 1.5; return; }
+  if (adapt.cooldown > 0) { adapt.cooldown--; return; }
   if (fps < 40 && adapt.level < LADDER.length) {
     LADDER[adapt.level].apply(false);
     adapt.level++;
-    adapt.cooldown = 3;
+    adapt.cooldown = 1;
   } else if (fps > 58 && adapt.level > 0) {
     adapt.level--;
     LADDER[adapt.level].apply(true);
-    adapt.cooldown = 4.5;
+    adapt.cooldown = 3;
   }
 }
 
@@ -405,7 +405,7 @@ function loop() {
   post.render({ realTime: t, fade: runtime.fade, dof: runtime.dofOn,
     aperture: runtime.dofOn === false ? 0 : camera.userData.aperture });
 
-  adaptStep(dt);
+  adaptStep(wall);
 
   frames++;
   fpsAcc += wall;

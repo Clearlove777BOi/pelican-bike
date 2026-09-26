@@ -40,6 +40,7 @@ const ev = async (expr) => (await send('Runtime.evaluate', { expression: expr, r
 await send('Runtime.enable'); await send('Page.enable');
 await send('Page.navigate', { url: URL_ });
 await sleep(12000);
+for (let i = 0; i < 40 && !(await ev(`!!window.__pelican`)); i++) await sleep(1000);
 await ev(`document.getElementById('enter')?.click()`);
 await sleep(2000);
 
